@@ -7,6 +7,10 @@ final class DayProgressViewModel: ObservableObject {
     @Published private(set) var percentString = "--"
     @Published private(set) var elapsedString = "--"
     @Published private(set) var remainingString = "--"
+    @Published private(set) var weekProgressValue: Double = 0
+    @Published private(set) var weekPercentString = "--"
+    @Published private(set) var weekElapsedString = "--"
+    @Published private(set) var weekRemainingString = "--"
     @Published private(set) var lastUpdated: Date?
     @Published private(set) var isUpdating = false
     @Published private(set) var launchAtLoginEnabled = false
@@ -69,11 +73,18 @@ final class DayProgressViewModel: ObservableObject {
         defer { isUpdating = false }
 
         let snapshot = DayProgressCalculator.snapshot()
+        let weekSnapshot = DayProgressCalculator.weekSnapshot()
 
         progressValue = snapshot.progress
         percentString = "  \(snapshot.percent)%"
         elapsedString = Self.formatDuration(snapshot.elapsed)
         remainingString = Self.formatDuration(snapshot.remaining)
+
+        weekProgressValue = weekSnapshot.progress
+        weekPercentString = "\(weekSnapshot.percent)%"
+        weekElapsedString = Self.formatDuration(weekSnapshot.elapsed)
+        weekRemainingString = Self.formatDuration(weekSnapshot.remaining)
+
         lastUpdated = Date()
     }
 

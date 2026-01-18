@@ -6,11 +6,27 @@ struct MenuContentView: View {
 
     var body: some View {
         Group {
+            Text("Day Progress: \(progress.percentString)")
+                .font(.headline)
+
             Text("Elapsed: \(progress.elapsedString)")
                 .font(.caption)
                 .foregroundStyle(.secondary)
 
             Text("Remaining: \(progress.remainingString)")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            Divider()
+
+            Text("Week Progress: \(progress.weekPercentString)")
+                .font(.headline)
+
+            Text("Elapsed: \(progress.weekElapsedString)")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            Text("Remaining: \(progress.weekRemainingString)")
                 .font(.caption)
                 .foregroundStyle(.secondary)
 
