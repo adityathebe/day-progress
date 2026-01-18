@@ -1,0 +1,41 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Extract version from tag
+        id: version
+        run: echo "VERSION=${GITHUB_REF_NAME#v}" >> $GITHUB_OUTPUT
+
+      - name: Build release
+        run: ./scripts/package_release.sh "${{ steps.version.outputs.VERSION }}"
+
+      - name: Get SHA256
+        id: sha
+        run: echo "SHA256=$(shasum -a 256 build/DayProgressMenubar.zip | awk '{print $1}')" >> $GITHUB_OUTPUT
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: build/DayProgressMenubar.zip
+          body: |
+            ## Installation
+
+            ```bash
+            brew install --cask adityathebe/tap/day-progress
+            ```
+
+            **SHA256:** `${{ steps.sha.outputs.SHA256 }}`
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
