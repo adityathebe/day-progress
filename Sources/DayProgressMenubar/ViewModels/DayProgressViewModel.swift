@@ -12,6 +12,10 @@ final class DayProgressViewModel: ObservableObject {
     @Published private(set) var launchAtLoginEnabled = false
     @Published private(set) var launchAtLoginStatus: LaunchAtLoginStatus = .unknown
     @Published private(set) var launchAtLoginError: String?
+    @Published private(set) var progressMode: ProgressMode = {
+        let raw = UserDefaults.standard.string(forKey: "progressMode") ?? ""
+        return ProgressMode(rawValue: raw) ?? .day
+    }()
 
     private var timer: Timer?
     private let refreshInterval: TimeInterval = 60
@@ -52,6 +56,13 @@ final class DayProgressViewModel: ObservableObject {
         reloadLaunchAtLoginStatus()
     }
 
+    func setProgressMode(_ mode: ProgressMode) {
+        guard mode != progressMode else { return }
+        progressMode = mode
+        UserDefaults.standard.set(mode.rawValue, forKey: "progressMode")
+        updateSnapshot()
+    }
+
     private func startTimer() {
         timer?.invalidate()
         timer = Timer.scheduledTimer(withTimeInterval: refreshInterval, repeats: true) { [weak self] _ in
@@ -68,7 +79,7 @@ final class DayProgressViewModel: ObservableObject {
         isUpdating = true
         defer { isUpdating = false }
 
-        let snapshot = DayProgressCalculator.snapshot()
+        let snapshot = DayProgressCalculator.snapshot(mode: progressMode)
 
         progressValue = snapshot.progress
         percentString = "  \(snapshot.percent)%"

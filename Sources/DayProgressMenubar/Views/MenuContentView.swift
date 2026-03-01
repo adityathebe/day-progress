@@ -16,6 +16,15 @@ struct MenuContentView: View {
 
             Divider()
 
+            Picker("Progress Mode", selection: progressModeBinding) {
+                ForEach(ProgressMode.allCases, id: \.self) { mode in
+                    Text(mode.displayName).tag(mode)
+                }
+            }
+            .pickerStyle(.inline)
+
+            Divider()
+
             Toggle("Launch at Login", isOn: launchAtLoginBinding)
 
             if progress.launchAtLoginStatus == .requiresApproval {
@@ -47,6 +56,13 @@ struct MenuContentView: View {
         Binding(
             get: { progress.launchAtLoginEnabled },
             set: { progress.setLaunchAtLogin($0) }
+        )
+    }
+
+    private var progressModeBinding: Binding<ProgressMode> {
+        Binding(
+            get: { progress.progressMode },
+            set: { progress.setProgressMode($0) }
         )
     }
 }
