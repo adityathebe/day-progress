@@ -14,11 +14,22 @@ struct MenuContentView: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
 
+            // Location status — only shown in Daylight mode while waiting or on error
+            if progress.isWaitingForLocation {
+                Text("Waiting for location…")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            } else if let err = progress.locationError {
+                Text(err)
+                    .font(.caption)
+                    .foregroundStyle(.red)
+            }
+
             Divider()
 
             Picker("Progress Mode", selection: progressModeBinding) {
                 ForEach(ProgressMode.allCases, id: \.self) { mode in
-                    Text(mode.displayName).tag(mode)
+                    Text(progress.modeDisplayName(for: mode)).tag(mode)
                 }
             }
             .pickerStyle(.inline)
@@ -28,7 +39,7 @@ struct MenuContentView: View {
             Toggle("Launch at Login", isOn: launchAtLoginBinding)
 
             if progress.launchAtLoginStatus == .requiresApproval {
-                Text("Approve in System Settings -> General -> Login Items")
+                Text("Approve in System Settings → General → Login Items")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

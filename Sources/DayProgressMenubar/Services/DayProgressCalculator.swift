@@ -1,14 +1,15 @@
+import CoreLocation
 import Foundation
 
 // MARK: - Progress Mode
 
 enum ProgressMode: String, CaseIterable {
-    case day = "day"
+    case daylight = "daylight"
     case workHours = "workHours"
 
     var displayName: String {
         switch self {
-        case .day: return "Day"
+        case .daylight: return "Daylight (sunrise–sunset)"
         case .workHours: return "Work Hours (10am–8pm)"
         }
     }
@@ -33,27 +34,33 @@ enum DayProgressCalculator {
     private static let workDayStartHour = 10
     private static let workDayEndHour = 20
 
-    static func snapshot(mode: ProgressMode, now: Date = Date(), calendar: Calendar = .current)
-        -> DayProgressSnapshot
-    {
+    static func snapshot(
+        mode: ProgressMode,
+        coordinate: CLLocationCoordinate2D? = nil,
+        now: Date = Date(),
+        calendar: Calendar = .current
+    ) -> DayProgressSnapshot {
         switch mode {
-        case .day:
-            return daySnapshot(now: now, calendar: calendar)
+        case .daylight:
+            return daylightSnapshot(now: now, coordinate: coordinate, calendar: calendar)
         case .workHours:
             return workHoursSnapshot(now: now, calendar: calendar)
         }
     }
 
-    // MARK: Private
+    // MARK: - Private
 
-    private static func daySnapshot(now: Date, calendar: Calendar) -> DayProgressSnapshot {
-        let start = calendar.startOfDay(for: now)
-        guard let end = calendar.date(byAdding: .day, value: 1, to: start) else {
-            return emptySnapshot(anchor: start)
+    private static func daylightSnapshot(
+        now: Date, coordinate: CLLocationCoordinate2D?, calendar: Calendar
+    ) -> DayProgressSnapshot {
+        guard let coordinate,
+            let solar = SolarCalculator.solarTimes(for: now, coordinate: coordinate)
+        else {
+            // No location yet, or polar region — show 0 as a neutral placeholder
+            return emptySnapshot(anchor: calendar.startOfDay(for: now))
         }
-
-        let displayEnd = calendar.date(byAdding: .second, value: -1, to: end) ?? end
-        return makeSnapshot(now: now, start: start, end: end, displayEnd: displayEnd)
+        return makeSnapshot(now: now, start: solar.sunrise, end: solar.sunset,
+                            displayEnd: solar.sunset)
     }
 
     private static func workHoursSnapshot(now: Date, calendar: Calendar) -> DayProgressSnapshot {

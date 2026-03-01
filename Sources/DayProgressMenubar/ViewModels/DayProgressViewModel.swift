@@ -1,3 +1,4 @@
+import Combine
 import Foundation
 import ServiceManagement
 
@@ -14,14 +15,33 @@ final class DayProgressViewModel: ObservableObject {
     @Published private(set) var launchAtLoginError: String?
     @Published private(set) var progressMode: ProgressMode = {
         let raw = UserDefaults.standard.string(forKey: "progressMode") ?? ""
-        return ProgressMode(rawValue: raw) ?? .day
+        return ProgressMode(rawValue: raw) ?? .daylight
     }()
 
+    // Location state surfaced to the view
+    @Published private(set) var locationError: String?
+    @Published private(set) var isWaitingForLocation = false
+
+    private let locationService = LocationService()
+    private var locationCancellable: AnyCancellable?
     private var timer: Timer?
     private let refreshInterval: TimeInterval = 60
 
     init() {
         reloadLaunchAtLoginStatus()
+
+        // Re-snapshot whenever a location fix arrives
+        locationCancellable = locationService.$coordinate
+            .dropFirst()
+            .sink { [weak self] _ in
+                self?.updateSnapshot()
+                self?.updateLocationState()
+            }
+
+        if progressMode == .daylight {
+            locationService.requestLocation()
+        }
+
         refresh(force: true)
         startTimer()
     }
@@ -31,10 +51,24 @@ final class DayProgressViewModel: ObservableObject {
     }
 
     var menuBarLabel: String {
-        if percentString == "--" {
-            return "Day"
+        percentString == "--" ? "Day" : percentString
+    }
+
+    /// Display label for the mode picker — Daylight shows live sunrise/sunset times once location is known.
+    func modeDisplayName(for mode: ProgressMode) -> String {
+        switch mode {
+        case .workHours:
+            return mode.displayName
+        case .daylight:
+            guard let coordinate = locationService.coordinate,
+                let solar = SolarCalculator.solarTimes(for: Date(), coordinate: coordinate)
+            else {
+                return mode.displayName  // "Daylight (sunrise–sunset)" until location arrives
+            }
+            let rise = Self.formatTime(solar.sunrise)
+            let set  = Self.formatTime(solar.sunset)
+            return "Daylight (\(rise)–\(set))"
         }
-        return percentString
     }
 
     func refresh(force: Bool) {
@@ -60,8 +94,14 @@ final class DayProgressViewModel: ObservableObject {
         guard mode != progressMode else { return }
         progressMode = mode
         UserDefaults.standard.set(mode.rawValue, forKey: "progressMode")
+        if mode == .daylight {
+            locationService.requestLocation()
+        }
         updateSnapshot()
+        updateLocationState()
     }
+
+    // MARK: - Private
 
     private func startTimer() {
         timer?.invalidate()
@@ -79,13 +119,33 @@ final class DayProgressViewModel: ObservableObject {
         isUpdating = true
         defer { isUpdating = false }
 
-        let snapshot = DayProgressCalculator.snapshot(mode: progressMode)
+        let snapshot = DayProgressCalculator.snapshot(
+            mode: progressMode,
+            coordinate: locationService.coordinate
+        )
 
         progressValue = snapshot.progress
         percentString = "  \(snapshot.percent)%"
         elapsedString = Self.formatDuration(snapshot.elapsed)
         remainingString = Self.formatDuration(snapshot.remaining)
         lastUpdated = Date()
+    }
+
+    private func updateLocationState() {
+        guard progressMode == .daylight else {
+            locationError = nil
+            isWaitingForLocation = false
+            return
+        }
+        locationError = locationService.locationError
+        isWaitingForLocation = locationService.coordinate == nil && locationService.locationError == nil
+    }
+
+    private static func formatTime(_ date: Date) -> String {
+        let f = DateFormatter()
+        f.timeStyle = .short
+        f.dateStyle = .none
+        return f.string(from: date)
     }
 
     private static func formatDuration(_ interval: TimeInterval) -> String {
@@ -100,15 +160,9 @@ final class DayProgressViewModel: ObservableObject {
 
         return "\(minutes) min"
     }
-
-    private static func formatTime(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.timeStyle = .short
-        formatter.dateStyle = .none
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        return formatter.string(from: date)
-    }
 }
+
+// MARK: - LaunchAtLoginStatus
 
 enum LaunchAtLoginStatus: String {
     case enabled
@@ -119,16 +173,11 @@ enum LaunchAtLoginStatus: String {
 
     init(status: SMAppService.Status) {
         switch status {
-        case .enabled:
-            self = .enabled
-        case .notRegistered:
-            self = .notRegistered
-        case .requiresApproval:
-            self = .requiresApproval
-        case .notFound:
-            self = .notFound
-        @unknown default:
-            self = .unknown
+        case .enabled:           self = .enabled
+        case .notRegistered:     self = .notRegistered
+        case .requiresApproval:  self = .requiresApproval
+        case .notFound:          self = .notFound
+        @unknown default:        self = .unknown
         }
     }
 }

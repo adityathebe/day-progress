@@ -45,6 +45,8 @@ cat > "${APP_DIR}/Contents/Info.plist" <<PLIST
   <true/>
   <key>NSPrincipalClass</key>
   <string>NSApplication</string>
+  <key>NSLocationWhenInUseUsageDescription</key>
+  <string>Your location is used to calculate local sunrise and sunset times for Daylight progress mode.</string>
 </dict>
 </plist>
 PLIST
